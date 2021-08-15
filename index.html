@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+    <head>
+        <meta charset="utf-8" />
+        <meta
+            name="viewport"
+            content="user-scalable=no, width=device-width, initial-scale=1, maximum-scale=1 viewport-fit=cover"
+        />
+        <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+        <title><%= htmlWebpackPlugin.options.title %></title>
+        <style>
+            html,
+            body,
+            #app {
+                padding: 0;
+                margin: 0;
+                border: 0;
+                width: 100%;
+                height: 100%;
+                position: absolute;
+                text-align: center;
+            }
+            #funnel-root {
+                display: inline-block;
+            }
+        </style>
+    </head>
+
+    <body>
+        <div id="app">
+            <h1>Funnel Chart</h1>
+            <div id="funnel-root"></div>
+            <button id="switchTheme" style="margin-top: 100px">切换主题</button>
+        </div>
+    </body>
+</html>

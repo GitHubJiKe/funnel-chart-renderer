@@ -1,0 +1,25 @@
+{
+  "compilerOptions": {
+      "target": "esnext",
+      "module": "esnext",
+      "allowJs": false,
+      "strict": true,
+      "jsx": "preserve",
+      "importHelpers": true,
+      "moduleResolution": "node",
+      "experimentalDecorators": true,
+      "esModuleInterop": true,
+      "strictPropertyInitialization": false,
+      "allowSyntheticDefaultImports": true,
+      "sourceMap": true,
+      "types": ["jest"],
+      "baseUrl": ".",
+      "paths": {
+          "@/*": ["src/*"]
+      },
+      "outDir": "./dist",
+      "declaration": true
+  },
+  "include": ["src/**/*.ts"], // 要打包的文件
+  "exclude": ["node_modules"],
+}
