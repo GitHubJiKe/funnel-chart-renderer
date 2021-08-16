@@ -1,58 +1,7 @@
-type TData = {
-    [x: string]: string | number;
-};
-
-type TContainerOptions = {
-    width?: number;
-    height?: number;
-    padding?: number[] | number | "auto";
-};
-
-type TShapeOptions = {
-    maxSize?: number;
-    minSize?: number;
-    color?: string[] | string | Function;
-};
-
-interface IFunnelOptions {
-    data: TData[];
-    xField?: string;
-    yField?: string;
-    legend?: boolean;
-    tooltip?: boolean;
-    itemHeight?: number;
-    containerOpts?: TContainerOptions;
-    shapeOpts?: TShapeOptions;
-}
-
-const defaultThemes = {
-    theme1: [
-        "#5B8FF9",
-        "#61DDAA",
-        "#65789B",
-        "#F6BD16",
-        "#7262fd",
-        "#78D3F8",
-        "#9661BC",
-        "#F6903D",
-        "#008685",
-        "#F08BB4"
-    ],
-    theme2: [
-        "#5B8FF9",
-        "#CDDDFD",
-        "#CDF3E4",
-        "#CED4DE",
-        "#FCEBB9",
-        "#D3CEFD",
-        "#D3EEF9",
-        "#DECFEA",
-        "#FFE0C7",
-        "#BBDEDE",
-        "#FFE0ED"
-    ]
-};
-
+import { defaultThemes } from "./constant";
+import FunnelError from "./FunnelError";
+import { IFunnelOptions, TData, TContainerOptions, TShapeOptions, EventName } from "./types";
+import { createErrorEle, getLegendItem, px, setElementStyle } from "./util";
 export default class Funnel {
     private eleId: string;
     private opts: IFunnelOptions;
@@ -67,7 +16,9 @@ export default class Funnel {
     private legendEvents: Array<any> = [];
     private canvasEvents: Array<any> = [];
     private curHoverIdx: number | undefined;
-    private data: any[];
+    private data: TData[];
+    private dom: HTMLElement;
+
     private containerOpts: TContainerOptions = {
         width: 400,
         height: 400,
@@ -96,15 +47,21 @@ export default class Funnel {
         }
     }
 
-    private getDivElement(id: string) {
-        return document.getElementById(id);
-    }
+    private setDomStyle() {
+        if (this.dom) {
+            const { width, height, padding } = this.containerOpts;
+            this.dom.style.width = px(width!);
+            this.dom.style.height = px(height!);
 
-    private setDomStyle(dom: HTMLElement | null) {
-        if (dom) {
-            dom.style.width = `${this.containerOpts.width}px`;
-            dom.style.height = `${this.containerOpts.height}px`;
-            dom.style.padding = `${this.containerOpts.padding}px`;
+            if (padding) {
+                if (padding === "auto") {
+                    this.dom.style.padding = "auto";
+                } else if (Array.isArray(padding)) {
+                    this.dom.style.padding = padding.map(v => px(v)).join("");
+                } else {
+                    this.dom.style.padding = px(padding!);
+                }
+            }
         }
     }
 
@@ -166,25 +123,33 @@ export default class Funnel {
 
     private createLegend() {
         const legend = document.createElement("div");
-        legend.style.display = "flex";
-        legend.style.flexDirection = "row";
-        legend.style.justifyContent = "center";
-        legend.style.alignItems = "center";
-        legend.style.margin = "12px";
+
+        setElementStyle(legend, {
+            display: "flex",
+            flexDirection: "row",
+            justifyContent: "center",
+            alignItems: "center",
+            margin: px(12)
+        });
+
         legend.addEventListener("click", this.onLegendClick.bind(this), false);
-        const innerHTML = this.opts.data
+
+        legend.innerHTML = this.opts.data
             .map((v, idx) => {
                 const text = v[this.opts.xField!];
                 const val = v[this.opts.yField!];
                 let index = idx;
+
                 if (idx === this.colors.length) {
                     index = 0;
                 }
-                return `<div data-val="${val}" style="background-color:${this.colors[index]};display:inline-block;margin:0 8px;border-radius:4px;padding:4px 8px;text-align:center;cursor:pointer;font-size:12px;white-space:nowrap;">${text}</div>`;
+
+                const bgColor = this.colors[index];
+
+                return getLegendItem({ val, text, bgColor });
             })
             .join("");
 
-        legend.innerHTML = innerHTML;
         return legend;
     }
 
@@ -199,42 +164,28 @@ export default class Funnel {
         });
     }
 
-    private createCanvas() {
-        const canvas = document.createElement("canvas");
-        canvas.width = this.opts.containerOpts?.width!;
-        canvas.height = this.opts.containerOpts?.height!;
-        canvas.style.cursor = "pointer";
-        const onHover = this.onCanvasHover.bind(this);
-        canvas.addEventListener(
-            "mouseenter",
-            () => {
-                canvas.addEventListener("mousemove", onHover, false);
-            },
-            false
-        );
+    private setCanvasEventListener() {
+        if (this.canvas) {
+            const onClick = this.onCanvasClick.bind(this);
+            this.canvas.addEventListener("click", onClick, false);
 
-        const onClick = this.onCanvasClick.bind(this);
+            const onHover = this.onCanvasHover.bind(this);
 
-        canvas.addEventListener("click", onClick, false);
-
-        canvas.addEventListener(
-            "mouseleave",
-            () => {
-                canvas.removeEventListener("mousemove", onHover);
-            },
-            false
-        );
-
-        return canvas;
-    }
-
-    private createDiv() {
-        const div = document.createElement("div");
-        div.style.position = "relative";
-        div.style.width = "100%";
-        div.style.height = "100%";
-
-        return div;
+            this.canvas.addEventListener(
+                "mouseenter",
+                () => {
+                    this.canvas.addEventListener("mousemove", onHover, false);
+                },
+                false
+            );
+            this.canvas.addEventListener(
+                "mouseleave",
+                () => {
+                    this.canvas.removeEventListener("mousemove", onHover, false);
+                },
+                false
+            );
+        }
     }
 
     private getTextX() {
@@ -242,7 +193,7 @@ export default class Funnel {
         return w / 2;
     }
 
-    private drawPolygon(points: number[][], text: string) {
+    private drawPolygon(points: number[][], text: string | number) {
         const height = points[2][1];
 
         if (this.colorIdx === this.colors.length) {
@@ -264,52 +215,76 @@ export default class Funnel {
         this.ctx.fill();
         this.ctx.font = "14px 宋体";
 
-        const textW = this.ctx.measureText(text).width;
+        const textW = this.ctx.measureText(String(text)).width;
         let textX = this.getTextX();
 
         textX = textX - textW / 2;
 
-        this.ctx.strokeText(text, textX, height - this.itemHeight / 2.4, textW);
+        this.ctx.strokeText(String(text), textX, height - this.itemHeight / 2.4, textW);
         this.ctx.stroke();
         this.colorIdx += 1;
     }
 
+    private setCanvasStyle() {
+        if (this.canvas) {
+            const { width, height } = this.containerOpts;
+            this.canvas.width = width!;
+            this.canvas.height = height!;
+            this.canvas.style.cursor = "pointer";
+        }
+    }
+
     render() {
-        const dom = this.getDivElement(this.eleId);
-        this.setDomStyle(dom);
-        const canvas = this.createCanvas();
-        this.canvas = canvas;
-        const ctx = canvas.getContext("2d");
-        this.ctx = ctx!;
-        const div = this.createDiv();
-        if (this.opts.legend) {
-            const legend = this.createLegend();
-            div.append(legend);
+        const dom = document.getElementById(this.eleId);
+
+        if (!dom) {
+            const error = new FunnelError("400");
+            throw error;
         }
 
-        div?.append(canvas);
-        this.container = div;
+        this.dom = dom;
+        this.setDomStyle();
+
+        this.canvas = document.createElement("canvas");
+        this.setCanvasStyle();
+        this.setCanvasEventListener();
+
+        this.ctx = this.canvas.getContext("2d")!;
+
+        this.container = document.createElement("div");
+
+        setElementStyle(this.container, { width: "100%", height: "100%", position: "relative" });
+
+        if (this.opts.legend) {
+            this.container.append(this.createLegend());
+        }
+
+        this.container.append(this.canvas);
 
         if (this.opts.tooltip) {
-            const tooltip = this.createToolTip();
-            this.tooltip = tooltip;
-            div.append(tooltip);
+            this.tooltip = this.createToolTip();
+            this.container.append(this.tooltip);
         }
 
-        dom?.append(div);
+        this.dom.append(this.container);
 
-        const points = this.getPoints();
-        this.points = points;
-        const data = this.getData();
+        this.data = this.getData();
 
-        points.forEach((ps, idx) => {
-            this.drawPolygon(ps, data[idx].text as string);
+        if (this.data.length < 2) {
+            const error = new FunnelError("401");
+            this.container.innerHTML = createErrorEle(error.code, error.message);
+            throw error;
+        }
+
+        this.points = this.getPoints();
+
+        this.points.forEach((ps, idx) => {
+            this.drawPolygon(ps, this.data[idx].text);
         });
     }
 
     private getPoints() {
-        const data = this.getData();
-        this.data = data;
+        const data = this.data;
         const canvasWidth = this.canvas.width;
         const points: number[][][] = [];
 
@@ -334,6 +309,7 @@ export default class Funnel {
             const prevP = points[idx - 1];
             const prevD = data[idx - 1];
             const curD = data[idx];
+
             if (nextP) {
                 point.push(nextP[1], nextP[0]);
             } else {
@@ -353,31 +329,36 @@ export default class Funnel {
         return ps;
     }
 
-    update(color: "theme1" | "theme2") {
-        this.colors = defaultThemes[color];
+    update(key?: string) {
+        if (key) {
+            const newTheme = defaultThemes[key as "theme1" | "theme2"];
+            if (newTheme) this.colors = newTheme;
+        }
+
         this.clear();
         this.render();
     }
 
     private createToolTip() {
         const tooltip = document.createElement("div");
-        tooltip.style.backgroundColor = "#fff";
-        tooltip.style.border = "1px solid #eeeeee";
-        tooltip.style.borderRadius = "4px";
-        tooltip.style.padding = "12px";
-        tooltip.style.width = "auto";
-        tooltip.style.whiteSpace = "nowrap";
-        tooltip.style.position = "absolute";
-        tooltip.style.visibility = "hidden";
+
+        setElementStyle(tooltip, {
+            position: "absolute",
+            width: "auto",
+            backgroundColor: "#fff",
+            border: "1px solid #eeeeee",
+            borderRadius: px(4),
+            padding: px(12),
+            whiteSpace: "nowrap",
+            visibility: "hidden"
+        });
+
         return tooltip;
     }
 
     private clear() {
         this.colorIdx = 0;
-
-        const dom = this.getDivElement(this.eleId);
-
-        dom?.removeChild(this.container!);
+        this.dom.removeChild(this.container!);
     }
 
     on(eventName: EventName, cb: (data: TData) => void) {
@@ -406,5 +387,3 @@ export default class Funnel {
         }
     }
 }
-
-type EventName = "legendClick" | "itemClick";

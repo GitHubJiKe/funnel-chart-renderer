@@ -10,10 +10,10 @@ function render() {
             { text: "第五层", value: 600 },
             { text: "第六层", value: 500 },
             { text: "第七层", value: 400 },
-            { text: "第八层", value: 300 },
+            { text: "第八层", value: 200 },
             { text: "第九层", value: 200 },
             { text: "第十层", value: 100 },
-            { text: "第十一层", value: 90 }
+            { text: "第十一层", value: 100 }
         ],
         xField: "text",
         yField: "value",
