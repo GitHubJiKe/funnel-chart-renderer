@@ -57,5 +57,8 @@
     "stylelintIntegration": true,
     "tslintIntegration": true,
     "eslintIntegration": true
+  },
+  "dependencies": {
+    "core-js": "^3.16.1"
   }
 }

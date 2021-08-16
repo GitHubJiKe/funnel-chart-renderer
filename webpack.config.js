@@ -5,12 +5,12 @@ const TerserPlugin = require("terser-webpack-plugin");
 
 module.exports = {
     mode: "production",
-    entry: { funnelChartRenderer: "./src/index.ts" },
+    entry: { funnelChart: "./src/index.ts" },
     output: {
         filename: "index.js",
         path: path.resolve(__dirname, "dist"),
         libraryTarget: "umd",
-        library: "funnelChartRenderer",
+        library: "funnelChart",
         libraryExport: "default"
     },
     module: {
