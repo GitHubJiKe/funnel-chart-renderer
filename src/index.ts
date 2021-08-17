@@ -1,6 +1,6 @@
 import { defaultThemes } from "./constant";
 import FunnelError from "./FunnelError";
-import { IFunnelOptions, TData, TContainerOptions, TShapeOptions, EventName } from "./types";
+import { IFunnelOptions, TData, TContainerOptions, EventName } from "./types";
 import { createErrorEle, getLegendItem, hexStringToRGB, px, setElementStyle } from "./util";
 export default class Funnel {
     private eleId: string;
@@ -17,18 +17,11 @@ export default class Funnel {
     private curHoverIdx: number | undefined;
     private data: TData[];
     private dom: HTMLElement;
-    private tempData: TData;
-    private copiedData: TData[];
 
     private containerOpts: TContainerOptions = {
         width: 400,
         height: 400,
         padding: 8
-    };
-
-    private shapeOpts: TShapeOptions = {
-        maxSize: 1,
-        minSize: 1
     };
 
     constructor(eleId: string, opts: IFunnelOptions) {
@@ -37,10 +30,6 @@ export default class Funnel {
 
         if (opts.containerOpts) {
             this.containerOpts = { ...this.containerOpts, ...opts.containerOpts };
-        }
-
-        if (opts.shapeOpts) {
-            this.shapeOpts = { ...this.shapeOpts, ...opts.shapeOpts };
         }
 
         this.itemHeight = this.containerOpts.height! / this.opts.data.length;
@@ -68,7 +57,7 @@ export default class Funnel {
         const { data, xField = "text", yField = "value" } = this.opts;
         return data
             .map(v => {
-                return { text: v[xField], value: v[yField] };
+                return { text: v[xField], value: v[yField], show: true };
             })
             .sort((v1, v2) => Number(v2.value) - Number(v1.value));
     }
@@ -80,20 +69,25 @@ export default class Funnel {
     }
 
     private hideItem(val: number) {
-        const idx = this.copiedData.findIndex(v => v.value === val);
+        const idx = this.data.findIndex(v => v.value === val);
+        const showLen = this.data.filter(v => v.show).length;
         const legendItem = document.querySelector(`.legend-item-${val}`) as HTMLDivElement;
         const lightColors = [...defaultThemes.theme1];
         const darkColors = [...defaultThemes.theme2];
 
         if (legendItem) {
             if (legendItem.style.backgroundColor === hexStringToRGB(lightColors[idx])) {
+                if (showLen <= 2) {
+                    alert("至少保留两条数据");
+                    return;
+                }
                 setElementStyle(legendItem, { backgroundColor: darkColors[idx] });
                 this.colors[idx] = darkColors[idx];
-                this.tempData = this.data.splice(idx, 1)[0];
+                this.data[idx]["show"] = false;
             } else {
                 setElementStyle(legendItem, { backgroundColor: lightColors[idx] });
                 this.colors[idx] = lightColors[idx];
-                this.data.splice(idx, 0, this.tempData);
+                this.data[idx]["show"] = true;
             }
         }
 
@@ -103,12 +97,13 @@ export default class Funnel {
     }
 
     private onCanvasHover(e: any) {
+        const data = this.data.filter(v => v.show);
         this.points.forEach((point, idx) => {
             const lt = point[0];
             const rt = point[1];
             const rb = point[2];
             if (e.layerX > lt[0] && e.layerX < rt[0] && e.layerY > lt[1] && e.layerY < rb[1]) {
-                this.showTooltip(e.layerX, e.layerY, this.data[idx]);
+                this.showTooltip(e.layerX, e.layerY, data[idx]);
                 this.curHoverIdx = idx;
             }
         });
@@ -120,7 +115,7 @@ export default class Funnel {
             const rt = curPoints[1];
             const rb = curPoints[2];
             if (e.layerX > lt[0] && e.layerX < rt[0] && e.layerY > lt[1] && e.layerY < rb[1]) {
-                this.showTooltip(e.layerX, e.layerY, this.data[this.curHoverIdx!]);
+                this.showTooltip(e.layerX, e.layerY, data[this.curHoverIdx!]);
             } else {
                 this.hideTooltip();
             }
@@ -175,12 +170,14 @@ export default class Funnel {
     }
 
     private onCanvasClick(e: any) {
+        const data = this.data.filter(v => v.show);
+
         this.points.forEach((point, idx) => {
             const lt = point[0];
             const rt = point[1];
             const rb = point[2];
             if (e.layerX > lt[0] && e.layerX < rt[0] && e.layerY > lt[1] && e.layerY < rb[1]) {
-                this.canvasEvents.forEach(cb => cb(this.data[idx]));
+                this.canvasEvents.forEach(cb => cb(data[idx]));
             }
         });
     }
@@ -325,7 +322,6 @@ export default class Funnel {
 
         if (!this.data) {
             this.data = this.getData();
-            this.copiedData = this.getData();
         }
 
         if (this.data.length < 2) {
@@ -340,8 +336,9 @@ export default class Funnel {
     }
 
     private getPoints() {
-        const data = this.data;
+        const data = this.data.filter(v => v.show);
         const canvasWidth = this.canvas.width;
+        const baseWidth = canvasWidth * 0.8;
         const points: number[][][] = [];
 
         const total = data.reduce((p, c) => {
@@ -357,7 +354,7 @@ export default class Funnel {
             const cur = data[index];
             const cv = Number(cur.value);
             const rate = cv / total;
-            const w = (canvasWidth * 0.8 * rate) / maxRate;
+            const w = (baseWidth * rate) / maxRate;
             const offset = (canvasWidth - w) / 2;
 
             if (index === 0) {

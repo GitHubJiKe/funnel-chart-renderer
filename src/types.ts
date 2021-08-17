@@ -1,17 +1,11 @@
 export type TData = {
-    [x: string]: string | number;
+    [x: string]: any;
 };
 
 export type TContainerOptions = {
     width?: number;
     height?: number;
     padding?: number[] | number | "auto";
-};
-
-export type TShapeOptions = {
-    maxSize?: number;
-    minSize?: number;
-    color?: string[] | string | Function;
 };
 
 export interface IFunnelOptions {
@@ -21,7 +15,6 @@ export interface IFunnelOptions {
     legend?: boolean;
     tooltip?: boolean;
     containerOpts?: TContainerOptions;
-    shapeOpts?: TShapeOptions;
 }
 
 export type EventName = "itemClick";
