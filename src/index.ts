@@ -1,7 +1,7 @@
 import { defaultThemes } from "./constant";
 import FunnelError from "./FunnelError";
 import { IFunnelOptions, TData, TContainerOptions, TShapeOptions, EventName } from "./types";
-import { createErrorEle, getLegendItem, px, setElementStyle } from "./util";
+import { createErrorEle, getLegendItem, hexStringToRGB, px, setElementStyle } from "./util";
 export default class Funnel {
     private eleId: string;
     private opts: IFunnelOptions;
@@ -10,14 +10,15 @@ export default class Funnel {
     private colorIdx = 0;
     private itemHeight = 80;
     private points: number[][][] = [];
-    private colors: string[] = defaultThemes.theme1;
+    private colors: string[] = [...defaultThemes.theme1];
     private container: HTMLDivElement;
     private tooltip: HTMLDivElement;
-    private legendEvents: Array<any> = [];
     private canvasEvents: Array<any> = [];
     private curHoverIdx: number | undefined;
     private data: TData[];
     private dom: HTMLElement;
+    private tempData: TData;
+    private copiedData: TData[];
 
     private containerOpts: TContainerOptions = {
         width: 400,
@@ -32,7 +33,7 @@ export default class Funnel {
 
     constructor(eleId: string, opts: IFunnelOptions) {
         this.eleId = eleId;
-        this.opts = opts;
+        this.opts = { legend: true, tooltip: true, xField: "text", yField: "value", ...opts };
 
         if (opts.containerOpts) {
             this.containerOpts = { ...this.containerOpts, ...opts.containerOpts };
@@ -42,9 +43,7 @@ export default class Funnel {
             this.shapeOpts = { ...this.shapeOpts, ...opts.shapeOpts };
         }
 
-        if (this.opts.itemHeight) {
-            this.itemHeight = this.opts.itemHeight;
-        }
+        this.itemHeight = this.containerOpts.height! / this.opts.data.length;
     }
 
     private setDomStyle() {
@@ -77,8 +76,30 @@ export default class Funnel {
     private onLegendClick(e: Event) {
         // @ts-ignore
         const val = e.target.dataset["val"];
-        const d = this.data.find(d => d[this.opts.yField!] === Number(val));
-        this.legendEvents.forEach(cb => cb(d));
+        this.hideItem(Number(val));
+    }
+
+    private hideItem(val: number) {
+        const idx = this.copiedData.findIndex(v => v.value === val);
+        const legendItem = document.querySelector(`.legend-item-${val}`) as HTMLDivElement;
+        const lightColors = [...defaultThemes.theme1];
+        const darkColors = [...defaultThemes.theme2];
+
+        if (legendItem) {
+            if (legendItem.style.backgroundColor === hexStringToRGB(lightColors[idx])) {
+                setElementStyle(legendItem, { backgroundColor: darkColors[idx] });
+                this.colors[idx] = darkColors[idx];
+                this.tempData = this.data.splice(idx, 1)[0];
+            } else {
+                setElementStyle(legendItem, { backgroundColor: lightColors[idx] });
+                this.colors[idx] = lightColors[idx];
+                this.data.splice(idx, 0, this.tempData);
+            }
+        }
+
+        this.clear();
+
+        this.render();
     }
 
     private onCanvasHover(e: any) {
@@ -108,7 +129,7 @@ export default class Funnel {
 
     private showTooltip(x: number, y: number, data: { [x: string]: unknown }) {
         if (this.tooltip) {
-            this.tooltip.innerText = `${data[this.opts.xField!]} ~ ${data[this.opts.yField!]}`;
+            this.tooltip.innerText = `${data[this.opts.xField!]}: ${data[this.opts.yField!]}`;
             this.tooltip.style.visibility = "visible";
             this.tooltip.style.top = `${y}px`;
             this.tooltip.style.left = `${x + 200}px`;
@@ -193,36 +214,60 @@ export default class Funnel {
         return w / 2;
     }
 
-    private drawPolygon(points: number[][], text: string | number) {
-        const height = points[2][1];
+    private drawPolygon(points: number[][], data: TData, idx: number) {
+        const text = data.text;
+        const firstPoint = points[0];
+        const secondPoint = points[1];
+        const thirdPoint = points[2];
+        const lastPoint = points[3];
+        const height = thirdPoint[1];
 
         if (this.colorIdx === this.colors.length) {
             this.colorIdx = 0;
         }
 
         this.ctx.fillStyle = this.colors[this.colorIdx];
-        this.ctx.strokeStyle = "#fff";
         this.ctx.beginPath();
-        this.ctx.moveTo(points[0][0], points[0][1]);
-        this.ctx.lineTo(points[1][0], points[1][1]);
-        this.ctx.lineTo(points[2][0], height);
+        this.ctx.moveTo(firstPoint[0], firstPoint[1]);
+        this.ctx.lineTo(secondPoint[0], secondPoint[1]);
+        this.ctx.lineTo(thirdPoint[0], height);
 
-        if (points.length > 3) {
-            this.ctx.lineTo(points[3][0], points[3][1]);
-        }
+        // if (points.length > 3) {
+        this.ctx.lineTo(lastPoint[0], lastPoint[1]);
+        // }
 
-        this.ctx.lineTo(points[0][0], points[0][1]);
+        this.ctx.lineTo(firstPoint[0], firstPoint[1]);
         this.ctx.fill();
-        this.ctx.font = "14px 宋体";
 
         const textW = this.ctx.measureText(String(text)).width;
-        let textX = this.getTextX();
 
-        textX = textX - textW / 2;
+        if (textW <= secondPoint[0] - firstPoint[0]) {
+            this.ctx.font = "10px 宋体";
+            let textX = this.getTextX();
 
-        this.ctx.strokeText(String(text), textX, height - this.itemHeight / 2.4, textW);
-        this.ctx.stroke();
+            textX = textX - textW / 2;
+
+            this.ctx.fillStyle = "#fff";
+            this.ctx.fillText(String(text), textX, height - this.itemHeight / 2.4, textW);
+        }
+
+        const transferRate = this.getTransferRate(idx + 1);
+
+        if (transferRate) {
+            // const w = this.ctx.measureText(transferRate).width;
+            this.ctx.fillStyle = "#000000";
+            this.ctx.fillText(transferRate, thirdPoint[0] + 15, thirdPoint[1]);
+        }
         this.colorIdx += 1;
+    }
+
+    private getTransferRate(idx: number) {
+        const b = this.data[idx];
+        const a = this.data[idx - 1];
+        if (b && a) {
+            return "转化率" + (Number(b.value) / Number(a.value)).toPrecision(2).replace("0.", " ").concat("%");
+        }
+        return "";
     }
 
     private setCanvasStyle() {
@@ -234,7 +279,7 @@ export default class Funnel {
         }
     }
 
-    render() {
+    private append() {
         const dom = document.getElementById(this.eleId);
 
         if (!dom) {
@@ -255,10 +300,6 @@ export default class Funnel {
 
         setElementStyle(this.container, { width: "100%", height: "100%", position: "relative" });
 
-        if (this.opts.legend) {
-            this.container.append(this.createLegend());
-        }
-
         this.container.append(this.canvas);
 
         if (this.opts.tooltip) {
@@ -266,9 +307,26 @@ export default class Funnel {
             this.container.append(this.tooltip);
         }
 
-        this.dom.append(this.container);
+        if (this.opts.legend) {
+            this.container.append(this.createLegend());
+        }
 
-        this.data = this.getData();
+        this.dom.append(this.container);
+    }
+
+    private doRender() {
+        this.points.forEach((ps, idx) => {
+            this.drawPolygon(ps, this.data[idx], idx);
+        });
+    }
+
+    render() {
+        this.append();
+
+        if (!this.data) {
+            this.data = this.getData();
+            this.copiedData = this.getData();
+        }
 
         if (this.data.length < 2) {
             const error = new FunnelError("401");
@@ -278,9 +336,7 @@ export default class Funnel {
 
         this.points = this.getPoints();
 
-        this.points.forEach((ps, idx) => {
-            this.drawPolygon(ps, this.data[idx].text);
-        });
+        this.doRender();
     }
 
     private getPoints() {
@@ -288,12 +344,22 @@ export default class Funnel {
         const canvasWidth = this.canvas.width;
         const points: number[][][] = [];
 
+        const total = data.reduce((p, c) => {
+            //@ts-ignore
+            return p + c.value;
+        }, 0);
+
+        //@ts-ignore
+        const maxRate = data[0].value / total;
+
         for (let index = 0; index < data.length; index++) {
             const point: number[][] = [];
             const cur = data[index];
             const cv = Number(cur.value);
-            const w = (cv * canvasWidth * 0.8) / 1000;
+            const rate = cv / total;
+            const w = (canvasWidth * 0.8 * rate) / maxRate;
             const offset = (canvasWidth - w) / 2;
+
             if (index === 0) {
                 point.push([offset, 0]);
                 point.push([offset + w, 0]);
@@ -307,20 +373,17 @@ export default class Funnel {
         const ps = points.map((point, idx) => {
             const nextP = points[idx + 1];
             const prevP = points[idx - 1];
-            const prevD = data[idx - 1];
-            const curD = data[idx];
+            // const prevD = data[idx - 1];
+            // const curD = data[idx];
 
             if (nextP) {
                 point.push(nextP[1], nextP[0]);
             } else {
-                if (prevD.value === curD.value) {
-                    point.push(
-                        [prevP[2][0], prevP[2][1] + this.itemHeight],
-                        [prevP[3][0], prevP[3][1] + this.itemHeight]
-                    );
-                } else {
-                    point.push([canvasWidth / 2, point[0][1] + this.itemHeight]);
-                }
+                // if (prevD.value === curD.value) {
+                point.push([prevP[2][0], prevP[2][1] + this.itemHeight], [prevP[3][0], prevP[3][1] + this.itemHeight]);
+                // } else {
+                //     point.push([canvasWidth / 2, point[0][1] + this.itemHeight]);
+                // }
             }
 
             return point;
@@ -362,10 +425,6 @@ export default class Funnel {
     }
 
     on(eventName: EventName, cb: (data: TData) => void) {
-        if (eventName === "legendClick") {
-            this.legendEvents.push(cb);
-        }
-
         if (eventName === "itemClick") {
             this.canvasEvents.push(cb);
         }
@@ -376,13 +435,6 @@ export default class Funnel {
             const idx = this.canvasEvents.findIndex(v => v === cb);
             if (idx > -1) {
                 this.canvasEvents.splice(idx, 1);
-            }
-        }
-
-        if (eventName === "legendClick") {
-            const idx = this.legendEvents.findIndex(v => v === cb);
-            if (idx > -1) {
-                this.legendEvents.splice(idx, 1);
             }
         }
     }

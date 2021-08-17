@@ -3,8 +3,12 @@ const webpack = require("webpack");
 const HtmlWebpackPlugin = require("html-webpack-plugin");
 const { CleanWebpackPlugin } = require("clean-webpack-plugin");
 module.exports = {
-    mode: "development",
+    mode: "production",
     entry: "./example/index.ts",
+    output: {
+        filename: "bundle.js",
+        path: path.resolve(__dirname, "demo")
+    },
     module: {
         rules: [
             {
@@ -14,16 +18,10 @@ module.exports = {
             }
         ]
     },
-    devServer: {
-        contentBase: path.join(__dirname, "dist"),
-        compress: true,
-        port: 9002,
-        disableHostCheck: true
-    },
     plugins: [
         new CleanWebpackPlugin(),
         new HtmlWebpackPlugin({
-            title: "Funnel Chart",
+            title: "Funnel Chart Demo",
             filename: "index.html",
             template: path.join(__dirname, "/index.html")
         }),

@@ -20,9 +20,8 @@ export interface IFunnelOptions {
     yField?: string;
     legend?: boolean;
     tooltip?: boolean;
-    itemHeight?: number;
     containerOpts?: TContainerOptions;
     shapeOpts?: TShapeOptions;
 }
 
-export type EventName = "legendClick" | "itemClick";
+export type EventName = "itemClick";

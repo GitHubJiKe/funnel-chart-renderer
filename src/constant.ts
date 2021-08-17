@@ -12,7 +12,7 @@ export const defaultThemes = {
         "#F08BB4"
     ],
     theme2: [
-        "#5B8FF9",
+        "#B8E1FF",
         "#CDDDFD",
         "#CDF3E4",
         "#CED4DE",
