@@ -97,7 +97,7 @@ export default class Funnel {
     }
 
     private onCanvasHover(e: any) {
-        const data = this.data.filter(v => v.show);
+        const data = this.showData();
         this.points.forEach((point, idx) => {
             const lt = point[0];
             const rt = point[1];
@@ -170,7 +170,7 @@ export default class Funnel {
     }
 
     private onCanvasClick(e: any) {
-        const data = this.data.filter(v => v.show);
+        const data = this.showData();
 
         this.points.forEach((point, idx) => {
             const lt = point[0];
@@ -219,10 +219,11 @@ export default class Funnel {
         const lastPoint = points[3];
         const height = thirdPoint[1];
 
+        console.log(data, text);
+
         if (this.colorIdx === this.colors.length) {
             this.colorIdx = 0;
         }
-
         this.ctx.fillStyle = this.colors[this.colorIdx];
         this.ctx.beginPath();
         this.ctx.moveTo(firstPoint[0], firstPoint[1]);
@@ -233,7 +234,6 @@ export default class Funnel {
         this.ctx.lineTo(lastPoint[0], lastPoint[1]);
         // }
 
-        this.ctx.lineTo(firstPoint[0], firstPoint[1]);
         this.ctx.fill();
 
         const textW = this.ctx.measureText(String(text)).width;
@@ -312,9 +312,14 @@ export default class Funnel {
     }
 
     private doRender() {
+        const data = this.showData();
         this.points.forEach((ps, idx) => {
-            this.drawPolygon(ps, this.data[idx], idx);
+            this.drawPolygon(ps, data[idx], idx);
         });
+    }
+
+    private showData() {
+        return this.data.filter(v => v.show);
     }
 
     render() {
@@ -336,7 +341,7 @@ export default class Funnel {
     }
 
     private getPoints() {
-        const data = this.data.filter(v => v.show);
+        const data = this.showData();
         const canvasWidth = this.canvas.width;
         const baseWidth = canvasWidth * 0.8;
         const points: number[][][] = [];
