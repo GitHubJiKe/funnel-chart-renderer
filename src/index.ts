@@ -58,8 +58,7 @@ export default class Funnel {
         return data
             .map(v => {
                 return { text: v[xField], value: v[yField], show: true };
-            })
-            .sort((v1, v2) => Number(v2.value) - Number(v1.value));
+            });
     }
 
     private onLegendClick(e: Event) {
