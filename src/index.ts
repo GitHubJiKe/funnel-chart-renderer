@@ -219,7 +219,6 @@ export default class Funnel {
         const lastPoint = points[3];
         const height = thirdPoint[1];
 
-        console.log(data, text);
 
         if (this.colorIdx === this.colors.length) {
             this.colorIdx = 0;
@@ -259,10 +258,11 @@ export default class Funnel {
     }
 
     private getTransferRate(idx: number) {
-        const b = this.data[idx];
-        const a = this.data[idx - 1];
+        const data = this.showData()
+        const b = data[idx];
+        const a = data[idx - 1];
         if (b && a) {
-            return "转化率" + (Number(b.value) / Number(a.value)).toPrecision(2).replace("0.", " ").concat("%");
+            return "转化率" + (Number(b.value) / Number(a.value) * 100).toString().concat("%");
         }
         return "";
     }
